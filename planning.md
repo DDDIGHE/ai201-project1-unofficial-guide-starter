@@ -1,122 +1,71 @@
 # Project 1 Planning: The Unofficial Guide
 
-> Write this document before you write any pipeline code.
-> Your spec and architecture diagram are what you'll use to direct AI tools (Claude, Copilot, etc.) to generate your implementation — the more specific they are, the more useful the generated code will be.
-> Update the Retrieval Approach and Chunking Strategy sections if you change your approach during implementation.
-> Update this file before starting any stretch features.
-
----
-
 ## Domain
 
-<!-- What domain did you choose? Why is this knowledge valuable and hard to find through official channels? -->
-
----
+Off-campus housing advice for Stony Brook students. This information is hard to use because it is scattered across Reddit posts and student replies instead of one searchable source.
 
 ## Documents
 
-<!-- List your specific sources: URLs, subreddit names, forum threads, or file descriptions.
-     Aim for at least 10 sources that together cover different subtopics or perspectives within your domain. -->
-
 | # | Source | Description | URL or location |
 |---|--------|-------------|-----------------|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
-| 4 | | | |
-| 5 | | | |
-| 6 | | | |
-| 7 | | | |
-| 8 | | | |
-| 9 | | | |
-| 10 | | | |
-
----
+| 1 | r/SBU housing search thread | Budget and search advice | https://www.reddit.com/r/SBU/comments/1t4dx0z/off_campus_housing_for_sbu/ |
+| 2 | r/SBU graduate roommate post | $900-$1000 roommate search | https://www.reddit.com/r/SBU/comments/1eeyvht |
+| 3 | r/SBU housing quality thread | rent, roommates, deposits, old houses | https://www.reddit.com/r/SBU/comments/1rjtnja/off_campus_housing/ |
+| 4 | r/SBU international student thread | scams, locations, search sites | https://www.reddit.com/r/SBU/comments/1b7oyij |
+| 5 | r/SBU missed campus housing thread | Facebook group warning | https://www.reddit.com/r/SBU/comments/1dezhk7 |
+| 6 | r/SBU official listing thread | official SBU listing access and limits | https://www.reddit.com/r/SBU/comments/13819jj |
+| 7 | r/SBU low-budget room thread | $850-$900 search advice | https://www.reddit.com/r/SBU/comments/1jkuzt4 |
+| 8 | r/SBU no-car close room thread | close housing and Lot 40 example | https://www.reddit.com/r/SBU/comments/1bq4xi3 |
+| 9 | r/SBU bus-access housing post | bus access and deposit warning context | https://www.reddit.com/r/SBU/comments/1dc91y1 |
+| 10 | r/SBU fall graduate budget thread | $1000 budget and Lot 40 example | https://www.reddit.com/r/SBU/comments/1cuwplk |
 
 ## Chunking Strategy
 
-<!-- How will you split documents into chunks?
-     State your chunk size (in tokens or characters), overlap size, and explain why those
-     numbers fit the structure of your documents.
-     A review-heavy corpus warrants different chunking than a long FAQ. -->
+**Chunk size:** 360 characters.
 
-**Chunk size:**
+**Overlap:** about 70 characters, implemented at word boundaries.
 
-**Overlap:**
-
-**Reasoning:**
-
----
+**Reasoning:** The documents are short Reddit-style posts and replies. Small chunks keep each warning or price point retrievable, while overlap keeps short housing advice from being split too harshly.
 
 ## Retrieval Approach
 
-<!-- Which embedding model are you using (e.g., all-MiniLM-L6-v2 via sentence-transformers)?
-     How many chunks will you retrieve per query (top-k)?
-     If you were deploying this for real users and cost wasn't a constraint, what tradeoffs
-     would you weigh in choosing a different embedding model — context length, multilingual
-     support, accuracy on domain-specific text, latency? -->
+**Embedding model:** `sentence-transformers/all-MiniLM-L6-v2`.
 
-**Embedding model:**
+**Top-k:** 5 returned chunks. ChromaDB first retrieves more candidates, then a small keyword overlap rerank fixes exact-warning queries like "deposit before seeing the place."
 
-**Top-k:**
-
-**Production tradeoff reflection:**
-
----
+**Production tradeoff reflection:** For a real deployment I would compare a stronger embedding model, multilingual support, latency, and hosted API cost. I would also add source/date metadata filters.
 
 ## Evaluation Plan
 
-<!-- List your 5 test questions with their expected correct answers.
-     Questions should be specific enough that you can judge whether the system's response
-     is right or wrong. "What are good dining halls?" is too vague.
-     "What do students say about wait times at [dining hall name] during lunch?" is testable. -->
-
 | # | Question | Expected answer |
 |---|----------|-----------------|
-| 1 | | |
-| 2 | | |
-| 3 | | |
-| 4 | | |
-| 5 | | |
-
----
+| 1 | Where should I search for an off-campus room under 900 dollars? | Shared-house bedrooms, SBU housing Facebook groups, Facebook Marketplace, Craigslist, bus stop posters, word of mouth, and Reddit. |
+| 2 | Should I pay an application fee or deposit before seeing the place in person? | No; students warn not to pay fees or deposits before seeing the place. |
+| 3 | If I have no car, should I stay near Stony Brook Road? | Yes; one reply says students without cars should stay in the Stony Brook area, especially around Stony Brook Road. |
+| 4 | Are one-bedroom apartments near SBU usually more than 2000 dollars per month? | Yes; one reply says one-bedroom apartments near SBU are usually more than $2000 per month. |
+| 5 | Which housing source has fewer scammers? | Private Facebook groups are described as having fewer scammers, but the system may confuse this with general scam warnings. |
 
 ## Anticipated Challenges
 
-<!-- What could go wrong? Name at least two specific risks with reasoning.
-     Consider: noisy or inconsistent documents, missing source attribution, off-topic
-     retrieval, chunks that split key information across boundaries. -->
+1. Many posts use overlapping terms like "deposit," so retrieval can confuse security-deposit advice with scam-deposit advice.
 
-1.
-
-2.
-
----
+2. Reddit posts are short and informal, so a broad question can retrieve a related but incomplete chunk.
 
 ## Architecture
 
-<!-- Draw a diagram of your pipeline showing the five stages:
-     Document Ingestion → Chunking → Embedding + Vector Store → Retrieval → Generation
-     Label each stage with the tool or library you're using.
-     You can use ASCII art, a Mermaid diagram, or embed a sketch as an image.
-     You'll use this diagram as context when prompting AI tools to implement each stage. -->
-
----
+```text
+documents/*.txt
+  -> ingest.py cleans text and builds word-boundary chunks
+  -> retriever.py embeds with all-MiniLM-L6-v2 and stores in ChromaDB
+  -> retriever.py retrieves top candidates and reranks with keyword overlap
+  -> query.py sends retrieved chunks to Groq if GROQ_API_KEY is set
+  -> cli.py prints answer, sources, and retrieved chunks
+```
 
 ## AI Tool Plan
 
-<!-- For each part of the pipeline below, describe:
-     - Which AI tool you plan to use (Claude, Copilot, ChatGPT, etc.)
-     - What you'll give it as input (which sections of this planning.md, which requirements)
-     - What you expect it to produce
-     - How you'll verify the output matches your spec
+**Milestone 3 — Ingestion and chunking:** Use Codex with the chunking section and source files as input. Verify with unit tests and `python ingest.py`.
 
-     "I'll use AI to help me code" is not a plan.
-     "I'll give Claude my Chunking Strategy section and ask it to implement chunk_text()
-     with my specified chunk size and overlap" is a plan. -->
+**Milestone 4 — Embedding and retrieval:** Use Codex to wire ChromaDB and sentence-transformers. Verify with CLI queries and source/distance output.
 
-**Milestone 3 — Ingestion and chunking:**
-
-**Milestone 4 — Embedding and retrieval:**
-
-**Milestone 5 — Generation and interface:**
+**Milestone 5 — Generation and interface:** Use Codex to build a Groq-backed grounded prompt plus a CLI. Verify with in-domain and out-of-scope queries.
